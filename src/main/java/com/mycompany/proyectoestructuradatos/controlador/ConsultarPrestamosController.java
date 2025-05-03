@@ -1,5 +1,6 @@
 package com.mycompany.proyectoestructuradatos.controlador;
 
+import com.mycompany.proyectoestructuradatos.controlador.Util.ArbolBinarioBusqueda;
 import com.mycompany.proyectoestructuradatos.controlador.gestorDeVistas.GestorDeVistas;
 import com.mycompany.proyectoestructuradatos.controlador.util.Validador;
 import com.mycompany.proyectoestructuradatos.modelo.dao.LibrosDao;
@@ -24,6 +25,7 @@ public class ConsultarPrestamosController {
     private JFmMenu vistaMenu;
     private PrestamosDao prestamosDao;
     public boolean bandera = false;
+   
 
     public ConsultarPrestamosController(JFmConsultarPrestamos vista, JFmMenu vistaMenu, JFrmLogin vistaLogin) {
         this.prestamosDao = new PrestamosDao();
@@ -51,13 +53,17 @@ public class ConsultarPrestamosController {
 
     private void listarTodosLosPrestamos() {
         try {
-            
-
-                    
             Usuario usuarioActual = SesionUsuario.getInstancia().getUsuario();
             vista.mostrarBotonDinamico(vista.getBtnDevolverLibro(), true);
             vista.mostrarComponentes(false);
             List<Map<String, Object>> listaDatos = prestamosDao.consultarprestamos(usuarioActual.getNumeroDocumento());
+
+//            arbolPrestamos = new ArbolBinarioBusqueda(); // Reiniciar árbol
+//            for (Map<String, Object> prestamo : listaDatos) {
+//                arbolPrestamos.insertar(prestamo);
+//            }
+
+            vista.actualizarVisor(listaDatos); // Muestra todos los préstamos en la vista
 
             if (!listaDatos.isEmpty()) {
                 vista.actualizarVisor(listaDatos);
@@ -78,9 +84,8 @@ public class ConsultarPrestamosController {
     private void listarLibrosPorBusqueda(String busqueda) {
         try {
 
-                   
             Usuario usuarioActual = SesionUsuario.getInstancia().getUsuario();
-            
+
             List<Map<String, Object>> listaDatos = prestamosDao.consultarprestamos(usuarioActual.getNumeroDocumento());
 
             if (!listaDatos.isEmpty()) {
@@ -99,21 +104,20 @@ public class ConsultarPrestamosController {
         }
     }
 
-public void generarDevolucion() {
-    if (vista.getIdPrestamo().trim().equals("")) {
-        JOptionPane.showMessageDialog(vista, "Los campos deben estar diligenciados.", "Error", JOptionPane.ERROR_MESSAGE);
-    } else {
-        
+    public void generarDevolucion() {
+        if (vista.getIdPrestamo().trim().equals("")) {
+            JOptionPane.showMessageDialog(vista, "Los campos deben estar diligenciados.", "Error", JOptionPane.ERROR_MESSAGE);
+        } else {
+
             int idPrestamo = Integer.parseInt(vista.getIdPrestamo());
-            
+
             // Verificar si el libro está disponible antes de prestarlo
             List<Map<String, Object>> prestamosEncontrados = prestamosDao.consultarPrestamoPorId(idPrestamo);
-            
+
             if (!prestamosEncontrados.isEmpty()) {
-             
-                
-                boolean Libroactualizado = prestamosDao.devolucionPrestamo(idPrestamo , Integer.parseInt(prestamosEncontrados.get(0).get("id_libro").toString()));
-                
+
+                boolean Libroactualizado = prestamosDao.devolucionPrestamo(idPrestamo, Integer.parseInt(prestamosEncontrados.get(0).get("id_libro").toString()));
+
                 if (Libroactualizado) {
                     JOptionPane.showMessageDialog(vista, "Libro Devuelto exitosamente.");
                     volverMenu();
@@ -127,8 +131,8 @@ public void generarDevolucion() {
 //        } else {
 //            JOptionPane.showMessageDialog(null, "Fecha inválida. Use el formato DD/MM/AAAA.");
 //        }
+        }
     }
-}
 
     public void volverMenu() {
         try {
