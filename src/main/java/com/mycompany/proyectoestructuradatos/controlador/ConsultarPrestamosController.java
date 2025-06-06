@@ -1,6 +1,7 @@
 package com.mycompany.proyectoestructuradatos.controlador;
 
 import com.mycompany.proyectoestructuradatos.controlador.Util.ArbolBinarioBusqueda;
+import com.mycompany.proyectoestructuradatos.controlador.Util.GrafoPrestamos;
 import com.mycompany.proyectoestructuradatos.controlador.gestorDeVistas.GestorDeVistas;
 import com.mycompany.proyectoestructuradatos.controlador.util.Validador;
 import com.mycompany.proyectoestructuradatos.modelo.dao.LibrosDao;
@@ -25,6 +26,7 @@ public class ConsultarPrestamosController {
     private JFmMenu vistaMenu;
     private PrestamosDao prestamosDao;
     public boolean bandera = false;
+    private GrafoPrestamos grafoPrestamos = new GrafoPrestamos();
    
 
     public ConsultarPrestamosController(JFmConsultarPrestamos vista, JFmMenu vistaMenu, JFrmLogin vistaLogin) {
@@ -32,6 +34,7 @@ public class ConsultarPrestamosController {
         this.vista = vista;
         this.vistaLogin = vistaLogin;
         this.vistaMenu = vistaMenu;
+        this.grafoPrestamos = new GrafoPrestamos();
         listarTodosLosPrestamos();
         this.vista.getBtnCerrarSesion().addActionListener(e -> volverALogin());
         this.vista.getBtnVolverMenu().addActionListener(e -> volverMenu());
@@ -54,30 +57,30 @@ public class ConsultarPrestamosController {
     private void listarTodosLosPrestamos() {
         try {
             Usuario usuarioActual = SesionUsuario.getInstancia().getUsuario();
-            vista.mostrarBotonDinamico(vista.getBtnDevolverLibro(), true);
-            vista.mostrarComponentes(false);
             List<Map<String, Object>> listaDatos = prestamosDao.consultarprestamos(usuarioActual.getNumeroDocumento());
 
-//            arbolPrestamos = new ArbolBinarioBusqueda(); // Reiniciar árbol
-//            for (Map<String, Object> prestamo : listaDatos) {
-//                arbolPrestamos.insertar(prestamo);
-//            }
+            // Limpiar grafo y agregar nodos/aristas actualizados
+            grafoPrestamos.limpiar();
+            for (Map<String, Object> prestamo : listaDatos) {
+                int idPrestamo = ((Long) prestamo.get("id_prestamo")).intValue();
+                String nombreUsuario = usuarioActual.getNombre();
+                String tituloLibro = (String) prestamo.get("titulo");
 
-            vista.actualizarVisor(listaDatos); // Muestra todos los préstamos en la vista
+                grafoPrestamos.agregarRelacion(nombreUsuario, tituloLibro);
+            }
 
-            if (!listaDatos.isEmpty()) {
-                vista.actualizarVisor(listaDatos);
-                // volverALogin();
+            vista.mostrarBotonDinamico(vista.getBtnDevolverLibro(), true);
+            vista.mostrarComponentes(false);
+            vista.actualizarVisor(listaDatos);
 
-            } else {
+            if (listaDatos.isEmpty()) {
                 JOptionPane.showMessageDialog(vista, "No Existen libros disponibles.");
             }
+
         } catch (Exception e) {
-
             e.printStackTrace();
-            JOptionPane.showMessageDialog(vista, "Ocurrio un error al intentar consultar la atraccion. "
-                    + e.getMessage(), "Error vista", JOptionPane.ERROR_MESSAGE);
-
+            JOptionPane.showMessageDialog(vista, "Ocurrió un error al consultar los préstamos. "
+                    + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -104,34 +107,49 @@ public class ConsultarPrestamosController {
         }
     }
 
-    public void generarDevolucion() {
-        if (vista.getIdPrestamo().trim().equals("")) {
-            JOptionPane.showMessageDialog(vista, "Los campos deben estar diligenciados.", "Error", JOptionPane.ERROR_MESSAGE);
-        } else {
+   public void generarDevolucion() {
+        if (vista.getIdPrestamo().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(vista, "Debe ingresar un ID de préstamo.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
+        try {
             int idPrestamo = Integer.parseInt(vista.getIdPrestamo());
-
-            // Verificar si el libro está disponible antes de prestarlo
             List<Map<String, Object>> prestamosEncontrados = prestamosDao.consultarPrestamoPorId(idPrestamo);
 
             if (!prestamosEncontrados.isEmpty()) {
+                int idLibro = Integer.parseInt(prestamosEncontrados.get(0).get("id_libro").toString());
 
-                boolean Libroactualizado = prestamosDao.devolucionPrestamo(idPrestamo, Integer.parseInt(prestamosEncontrados.get(0).get("id_libro").toString()));
+                boolean exito = prestamosDao.devolucionPrestamo(idPrestamo, idLibro);
 
-                if (Libroactualizado) {
-                    JOptionPane.showMessageDialog(vista, "Libro Devuelto exitosamente.");
+                if (exito) {
+                    // Eliminar relación del grafo
+                    String tituloLibro = buscarTituloLibroPorId(idLibro);
+                    String nombreUsuario = SesionUsuario.getInstancia().getUsuario().getNombre();
+                    grafoPrestamos.eliminarRelacion(nombreUsuario, tituloLibro);
+
+                    JOptionPane.showMessageDialog(vista, "Libro devuelto exitosamente.");
                     volverMenu();
                 } else {
-                    JOptionPane.showMessageDialog(vista, "Error al Devolver el libro.", "Error", JOptionPane.ERROR_MESSAGE);
-                    volverMenu();
+                    JOptionPane.showMessageDialog(vista, "Error al devolver el libro.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
             } else {
-                JOptionPane.showMessageDialog(vista, "El prestamo ingresado no existe.", "Error", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(vista, "El préstamo ingresado no existe.", "Error", JOptionPane.WARNING_MESSAGE);
             }
-//        } else {
-//            JOptionPane.showMessageDialog(null, "Fecha inválida. Use el formato DD/MM/AAAA.");
-//        }
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(vista, "ID de préstamo inválido.", "Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+   
+       private String buscarTituloLibroPorId(int idLibro) {
+        List<Map<String, Object>> listaLibros = prestamosDao.consultarLibrosPorBusqueda("");
+        for (Map<String, Object> libro : listaLibros) {
+            if (((Long) libro.get("id_libro")).intValue() == idLibro) {
+                return (String) libro.get("titulo");
+            }
+        }
+        return "";
     }
 
     public void volverMenu() {
